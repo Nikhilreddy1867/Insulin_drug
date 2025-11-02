@@ -1,4 +1,7 @@
 #@title Setup Flask API & ngrok (Add this cell at the END of your notebook)
+# ⚠️ IMPORTANT: After pasting this code, SAVE THE NOTEBOOK (File → Save or Ctrl+S/Cmd+S)
+# Otherwise, this code will disappear when you disconnect from runtime!
+
 # Install Flask and ngrok
 !pip install -q flask flask-cors pyngrok
 

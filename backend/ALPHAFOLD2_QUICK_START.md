@@ -29,6 +29,11 @@ Instead of copying/pasting PDB files manually, your website will automatically:
 
 Open the file `ALPHAFOLD2_COLAB_CODE.py` in this folder and copy **all the code** into a new Colab cell.
 
+⚠️ **IMPORTANT**: After adding the code, **SAVE THE NOTEBOOK**:
+- Click **File → Save** (or press `Ctrl+S` / `Cmd+S`)
+- This saves your changes permanently
+- If you don't save, the code will disappear when you disconnect!
+
 ### Step 4: Get ngrok Token
 1. Sign up at https://ngrok.com (free account works)
 2. Go to: https://dashboard.ngrok.com/get-started/your-authtoken
