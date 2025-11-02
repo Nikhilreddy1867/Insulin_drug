@@ -167,22 +167,30 @@ uvicorn api:app --host 0.0.0.0 --port 8000
 5. View generated SMILES molecules
 
 ### AlphaFold2 Structure Prediction
+
+**Automatic Integration** - Rank 1 PDB is extracted automatically, no manual copying needed!
+
 1. **Setup Colab Notebook** (one-time):
-   - Open `backend/colab_flask_helper_alphafold2_fixed.py` in Google Colab
-   - Update ngrok token in the code
-   - Run all cells
-   - Copy the ngrok URL
+   - Open [ColabFold AlphaFold2 Notebook](https://colab.research.google.com/github/sokrypton/ColabFold/blob/main/AlphaFold2.ipynb)
+   - Make a copy: **File → Save a copy in Drive**
+   - Scroll to the END of the notebook
+   - Add a NEW cell and paste code from `backend/COLAB_CELL_CODE.txt`
+   - Replace `YOUR_NGROK_TOKEN_HERE` with your ngrok token ([get token here](https://dashboard.ngrok.com/get-started/your-authtoken))
+   - Run the cell and copy the ngrok URL that appears
 
 2. **Update Backend**:
-   - Add ngrok URL to `backend/.env`: `ALPHAFOLD2_NGROK_URL=...`
+   - Add ngrok URL to `backend/.env`: `ALPHAFOLD2_NGROK_URL=https://your-url.ngrok-free.app`
    - Restart Flask backend
 
 3. **Use in Dashboard**:
    - Dashboard → AlphaFold2 tab
    - Enter protein sequence
    - Click "Predict Structure"
-   - Wait 5-15 minutes for results
-   - Download PDB file
+   - Wait 2-15 minutes for results
+   - **Rank 1 PDB is automatically extracted and displayed** - no manual copying!
+   - View 3D structure in the interactive viewer
+
+**📚 Detailed Setup Guide**: See `backend/ALPHAFOLD2_QUICK_START.md` for step-by-step instructions.
 
 ### Molecular Docking
 
@@ -216,8 +224,9 @@ pip install rdkit
 1. Dashboard → Complete Pipeline tab
 2. Enter protein sequence and SMILES
 3. Click "Run Complete Pipeline"
-4. Automatically runs: Sequence → AlphaFold2 → Docking
+4. Automatically runs: **Sequence → AlphaFold2 → Extract Rank 1 PDB → Docking**
 5. View combined results with 3D visualization
+6. **No manual copying needed** - everything is automated!
 
 ## 🔧 Configuration
 
@@ -250,19 +259,22 @@ python setup_mongodb.py
 
 ```
 Insulin_drug/
-├── backend/                 # Flask backend server
-│   ├── combined_server.py  # Main server (port 5001)
-│   ├── local_docking.py    # Local docking module
-│   ├── requirements.txt     # Python dependencies
-│   └── models/             # ML model files
-├── python-api/             # FastAPI service (port 8000)
-│   ├── api.py              # SMILES generation service
+├── backend/                              # Flask backend server
+│   ├── combined_server.py               # Main server (port 5001)
+│   ├── local_docking.py                 # Local docking module
+│   ├── requirements.txt                 # Python dependencies
+│   ├── COLAB_CELL_CODE.txt             # Colab notebook integration code
+│   ├── ALPHAFOLD2_QUICK_START.md        # Quick setup guide
+│   ├── ALPHAFOLD2_COLAB_INTEGRATION.md  # Detailed integration guide
+│   └── models/                          # ML model files
+├── python-api/                          # FastAPI service (port 8000)
+│   ├── api.py                           # SMILES generation service
 │   └── requirements.txt
-├── src/                    # React frontend
-│   ├── pages/              # Page components
-│   └── components/         # Reusable components
-├── package.json            # Frontend dependencies
-└── README.md               # This file
+├── src/                                 # React frontend
+│   ├── pages/                           # Page components
+│   └── components/                      # Reusable components
+├── package.json                         # Frontend dependencies
+└── README.md                            # This file
 ```
 
 ## 🐛 Troubleshooting
@@ -307,9 +319,22 @@ pip install rdkit
 - Install RDKit via pip
 
 ### AlphaFold2 Connection Errors
-- Verify Colab notebook is running
-- Check ngrok URL in `backend/.env`
+- Verify Colab notebook is running (keep tab open!)
+- Check ngrok URL in `backend/.env` matches the URL from Colab
 - Test connection: `curl http://localhost:5001/alphafold2/health`
+- If ngrok URL changed: Re-run the integration cell in Colab, get new URL, update `.env`, restart backend
+- See `backend/ALPHAFOLD2_QUICK_START.md` for troubleshooting
+
+## 📚 Documentation Files
+
+### AlphaFold2 Integration
+- **`backend/COLAB_CELL_CODE.txt`** - Code to paste into Colab notebook (start here!)
+- **`backend/ALPHAFOLD2_QUICK_START.md`** - Quick setup guide (recommended)
+- **`backend/ALPHAFOLD2_COLAB_INTEGRATION.md`** - Detailed integration guide
+- **`backend/ALPHAFOLD2_EXTRACT_RANK1.py`** - Simple PDB extraction script (optional)
+
+### FastAPI Service
+FastAPI service documentation is included in the main README (see "Start Servers" and "SMILES Generation" sections).
 
 ## 🚧 Development
 
