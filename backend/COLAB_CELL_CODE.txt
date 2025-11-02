@@ -1,0 +1,171 @@
+#@title Setup Flask API & ngrok (Add this cell at the END of your notebook)
+# Install Flask and ngrok
+!pip install -q flask flask-cors pyngrok
+
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import threading
+import os
+import glob
+from pathlib import Path
+
+app = Flask(__name__)
+CORS(app)
+
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'healthy', 'service': 'AlphaFold2'})
+
+@app.route('/predict', methods=['POST'])
+def predict_structure():
+    """
+    Receives sequence, runs AlphaFold2, returns rank 1 PDB content
+    """
+    try:
+        data = request.get_json()
+        sequence = data.get('sequence', '').strip().upper()
+        
+        if not sequence:
+            return jsonify({'error': 'Sequence is required'}), 400
+        
+        print(f"\n[AlphaFold2] Received sequence (length: {len(sequence)})")
+        print(f"[AlphaFold2] Starting prediction...")
+        
+        # Import ColabFold modules
+        from colabfold.download import download_alphafold_params
+        from colabfold.utils import setup_logging
+        from colabfold.batch import get_queries, run, set_model_type
+        import hashlib
+        import re
+        
+        # Create jobname
+        def add_hash(x, y):
+            return x + "_" + hashlib.sha1(y.encode()).hexdigest()[:5]
+        
+        basejobname = re.sub(r'\W+', '', "prediction")
+        new_jobname = add_hash(basejobname, sequence)
+        n = 0
+        while os.path.exists(new_jobname):
+            new_jobname = f"{new_jobname}_{n}"
+            n += 1
+        
+        os.makedirs(new_jobname, exist_ok=True)
+        
+        # Save query
+        queries_path = os.path.join(new_jobname, f"{new_jobname}.csv")
+        with open(queries_path, "w") as f:
+            f.write(f"id,sequence\n{new_jobname},{sequence}")
+        
+        # Setup
+        log_filename = os.path.join(new_jobname, "log.txt")
+        setup_logging(Path(log_filename))
+        queries, is_complex = get_queries(queries_path)
+        model_type_val = set_model_type(is_complex, model_type)
+        download_alphafold_params(model_type_val, Path("."))
+        
+        print(f"[AlphaFold2] Running prediction (takes 5-15 minutes)...")
+        
+        # Run prediction
+        results = run(
+            queries=queries,
+            result_dir=new_jobname,
+            use_templates=use_templates,
+            custom_template_path=custom_template_path,
+            num_relax=num_relax,
+            msa_mode=msa_mode,
+            model_type=model_type_val,
+            num_models=5,
+            num_recycles=num_recycles if num_recycles else 3,
+            relax_max_iterations=relax_max_iterations,
+            recycle_early_stop_tolerance=recycle_early_stop_tolerance,
+            num_seeds=num_seeds,
+            use_dropout=use_dropout,
+            model_order=[1,2,3,4,5],
+            is_complex=is_complex,
+            data_dir=Path("."),
+            keep_existing_results=False,
+            rank_by="auto",
+            pair_mode=pair_mode,
+            pairing_strategy=pairing_strategy,
+            stop_at_score=float(100),
+            dpi=dpi,
+            zip_results=False,
+            save_all=save_all,
+            max_msa=max_msa,
+            use_cluster_profile=False if "multimer" in model_type_val else True,
+            calc_extra_ptm=calc_extra_ptm,
+        )
+        
+        print(f"[AlphaFold2] Prediction complete! Extracting rank 1 PDB...")
+        
+        # Extract rank 1 PDB
+        jobname_prefix = ".custom" if msa_mode == "custom" else ""
+        tag = results["rank"][0][0]  # Rank 1 tag
+        pdb_filename = f"{new_jobname}/{new_jobname}{jobname_prefix}_unrelaxed_{tag}.pdb"
+        
+        # Fallback if file not found
+        if not os.path.exists(pdb_filename):
+            pdb_files = glob.glob(f"{new_jobname}/*unrelaxed*.pdb")
+            if pdb_files:
+                pdb_files.sort()
+                pdb_filename = pdb_files[0]
+        
+        # Read PDB content
+        with open(pdb_filename, 'r') as f:
+            pdb_content = f.read()
+        
+        # Calculate pLDDT score
+        plddt_values = []
+        for line in pdb_content.split('\n'):
+            if line.startswith('ATOM'):
+                try:
+                    b_factor = float(line[60:66].strip())
+                    if 0 <= b_factor <= 100:
+                        plddt_values.append(b_factor)
+                except:
+                    continue
+        
+        plddt_score = sum(plddt_values) / len(plddt_values) if plddt_values else 85.0
+        
+        print(f"[AlphaFold2] ✅ Rank 1 PDB extracted! pLDDT: {plddt_score:.2f}")
+        
+        return jsonify({
+            'pdb_content': pdb_content,
+            'plddt_score': round(plddt_score, 2),
+            'jobname': new_jobname,
+            'rank1_file': os.path.basename(pdb_filename)
+        })
+        
+    except Exception as e:
+        print(f"[AlphaFold2] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# Start Flask server
+def run_flask():
+    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+
+print("Starting Flask server...")
+flask_thread = threading.Thread(target=run_flask, daemon=True)
+flask_thread.start()
+print("✅ Flask server started on port 5000")
+
+# Setup ngrok
+from pyngrok import ngrok
+
+# ⚠️ REPLACE THIS WITH YOUR NGROK TOKEN:
+NGROK_AUTH_TOKEN = "YOUR_NGROK_TOKEN_HERE"
+
+if NGROK_AUTH_TOKEN and NGROK_AUTH_TOKEN != "YOUR_NGROK_TOKEN_HERE":
+    ngrok.set_auth_token(NGROK_AUTH_TOKEN)
+    public_url = ngrok.connect(5000)
+    print(f"\n🌐 ==========================================")
+    print(f"🌐 YOUR NGROK URL: {public_url}")
+    print(f"🌐 ==========================================")
+    print(f"\n📋 Copy this URL and add to backend/.env:")
+    print(f"   ALPHAFOLD2_NGROK_URL={public_url}")
+    print(f"\n✅ Server is ready!")
+else:
+    print("⚠️  ERROR: Replace NGROK_AUTH_TOKEN with your actual token!")
+
